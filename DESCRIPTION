@@ -1,0 +1,25 @@
+Package: cuhomopsummary
+Title: Summarise OMOP CDM Databases
+Version: 0.1.0
+Description: Provides Quarto and Shiny summaries for OMOP CDM databases.
+License: MIT
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Imports:
+    dplyr,
+    dbplyr,
+    rlang,
+    ggplot2,
+    shiny,
+    bslib,
+    quarto,
+    DT,
+    DBI,
+    purrr,
+    lubridate,
+    tidyr,
+    bsicons
+Suggests:
+    testthat (>= 3.0.0),
+    RSQLite
+Config/testthat/edition: 3

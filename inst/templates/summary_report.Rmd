@@ -1,0 +1,53 @@
+---
+title: "cuhomop: OMOP Database Summary"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+params:
+  summary_data: null
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(gt)
+```
+
+# Database Overview
+
+Summary of the OMOP CDM tables with completeness alerts.
+
+```{r, echo=FALSE, results='asis'}
+res_list <- params$summary_data
+for (tab in names(res_list)) {
+  res <- res_list[[tab]]
+  cat('\n## ', tab, '\n\n\n')
+  cat('**Total Rows:** ', format(res$count, big.mark = ','), '\n\n\n')
+  
+  # Render table using gt
+  table_obj <- res$cols |> 
+    gt() |> 
+    tab_header(title = paste('Column Summary:', tab)) |> 
+    tab_style(
+      style = cell_fill(color = '#ffcccc'),
+      locations = cells_body(rows = incomplete == TRUE)
+    ) |> 
+    cols_label(
+      column = 'Column Name',
+      incomplete = 'Incomplete?',
+      details = 'Concept Info'
+    )
+  
+  # Using as_raw_html to ensure it prints correctly in the loop
+  cat(as_raw_html(table_obj))
+  
+  if(length(res$plots) > 0) {
+     cat('\n\n\n')
+     print(res$plots$year)
+  }
+  cat('\n\n---\n\n')
+}
+```
+
