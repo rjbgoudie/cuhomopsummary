@@ -12,13 +12,12 @@ Imports:
     ggplot2,
     shiny,
     bslib,
-    quarto,
     DT,
     DBI,
     purrr,
     lubridate,
     tidyr,
-    bsicons
+    cli
 Suggests:
     testthat (>= 3.0.0),
     RSQLite

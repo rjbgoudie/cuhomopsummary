@@ -1,6 +1,5 @@
-
 #' Launch the cuhomop Shiny App
-#' 
+#'
 #' @param summary_list The output from summarise_omop_database
 #' @export
 run_cuhomop_shiny <- function(summary_list) {
@@ -17,17 +16,17 @@ run_cuhomop_shiny <- function(summary_list) {
       )
     )
   )
-  
+
   server <- function(input, output, session) {
     shiny::observeEvent(input$next_btn, {
       curr <- which(names(summary_list) == input$table_sel)
       nxt <- if(curr == length(summary_list)) 1 else curr + 1
       shiny::updateSelectInput(session, 'table_sel', selected = names(summary_list)[nxt])
     })
-    
+
     output$table_content <- shiny::renderUI({
       res <- summary_list[[input$table_sel]]
-      
+
       shiny::tagList(
         bslib::layout_column_wrap(
           width = 1,
@@ -54,6 +53,6 @@ run_cuhomop_shiny <- function(summary_list) {
       )
     })
   }
-  
+
   shiny::shinyApp(ui, server)
 }

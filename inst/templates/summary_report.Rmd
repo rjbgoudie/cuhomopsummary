@@ -7,12 +7,15 @@ output:
     theme: flatly
 params:
   summary_data: null
+  plugins_queries: null
+  caboodle_tables: null
 ---
 
 ```{r setup, include=FALSE}
 library(ggplot2)
 library(dplyr)
 library(gt)
+library(stringr)
 ```
 
 # Database Overview
@@ -21,10 +24,49 @@ Summary of the OMOP CDM tables with completeness alerts.
 
 ```{r, echo=FALSE, results='asis'}
 res_list <- params$summary_data
+plugins_queries <- params$plugins_queries
+caboodle_tables <- params$caboodle_tables
+
 for (tab in names(res_list)) {
   res <- res_list[[tab]]
   cat('\n## ', tab, '\n\n\n')
   cat('**Total Rows:** ', format(res$count, big.mark = ','), '\n\n\n')
+  
+  if (length(plugins_queries[tab]) > 0){
+    for (plugin in plugins_queries[tab]){
+      cat("### Queries\n\n\n\n<details><summary>SQL Queries</summary><code>")
+
+      if (length(plugin) > 0){
+        if (length(plugin[[1]]) > 0){
+          sql <- plugin[[1]][[1]] |>
+            str_replace_all("\n", "<br>") |>
+            str_replace_all(" ", "&nbsp;")
+          
+          cat(sql)
+        }
+      }
+     # cat(plugin[[1]][[1]])
+      
+      cat("</code></details>\n\n\n")
+    }
+  }
+  
+  if (length(caboodle_tables[tab]) > 0){
+    for (plugin in caboodle_tables[tab]){
+      cat("### Caboodle tables\n\n\n\n")
+
+      if (length(plugin) > 0){
+        if (length(plugin[[1]]) > 0){
+          tabs <- paste(unlist(plugin[[1]]), collapse = ", ")
+
+          cat(tabs)
+        }
+      }
+     # cat(plugin[[1]][[1]])
+
+      cat("\n\n\n")
+    }
+  }
   
   # Render table using gt
   table_obj <- res$cols |> 
@@ -44,10 +86,9 @@ for (tab in names(res_list)) {
   cat(as_raw_html(table_obj))
   
   if(length(res$plots) > 0) {
-     cat('\n\n\n')
-     print(res$plots$year)
+    cat('\n\n\n')
+    print(res$plots$year)
   }
   cat('\n\n---\n\n')
 }
 ```
-
