@@ -4,7 +4,7 @@ output:
   html_document:
     toc: true
     toc_float: true
-    theme: flatly
+    theme: cosmo
 params:
   summary_data: null
   plugins_queries: null
@@ -29,66 +29,72 @@ caboodle_tables <- params$caboodle_tables
 
 for (tab in names(res_list)) {
   res <- res_list[[tab]]
-  cat('\n## ', tab, '\n\n\n')
-  cat('**Total Rows:** ', format(res$count, big.mark = ','), '\n\n\n')
-  
-  if (length(plugins_queries[tab]) > 0){
-    for (plugin in plugins_queries[tab]){
-      cat("### Queries\n\n\n\n<details><summary>SQL Queries</summary><code>")
+  cat("\n## ", tab, "\n\n\n")
+  cat("**Total Rows:** ", format(res$count, big.mark = ","), "\n\n\n")
 
-      if (length(plugin) > 0){
-        if (length(plugin[[1]]) > 0){
-          sql <- plugin[[1]][[1]] |>
+  if (length(plugins_queries[tab]) > 0) {
+    cat("### SQL queries\n\n")
+    plugin_names <- names(plugins_queries[[tab]])
+    for (plugin_name in plugin_names) {
+      plugin <- plugins_queries[[tab]][[plugin_name]]
+      cat(glue("<details><summary>Plugin: {plugin_name}</summary><code>\n"))
+      if (length(plugin) > 0) {
+        nqueries <- length(plugin)
+        for (i in 1:nqueries) {
+          cat(glue("&ndash;&ndash; Query {i} of {nqueries}<br>"))
+          sql <- plugin[[i]] |>
             str_replace_all("\n", "<br>") |>
-            str_replace_all(" ", "&nbsp;")
-          
+            str_replace_all(" ", "&nbsp;") |>
+            # Prevent Pandoc from converting to curly quotes
+            str_replace_all("\"", "&quot;") |>
+            str_replace_all("'", "&apos;")
           cat(sql)
+          cat("<br><br>")
         }
       }
-     # cat(plugin[[1]][[1]])
-      
       cat("</code></details>\n\n\n")
     }
+    cat("\n\n")
   }
-  
-  if (length(caboodle_tables[tab]) > 0){
-    for (plugin in caboodle_tables[tab]){
+
+  if (length(caboodle_tables[tab]) > 0) {
+    for (plugin in caboodle_tables[tab]) {
       cat("### Caboodle tables\n\n\n\n")
 
-      if (length(plugin) > 0){
-        if (length(plugin[[1]]) > 0){
+      if (length(plugin) > 0) {
+        if (length(plugin[[1]]) > 0) {
           tabs <- paste(unlist(plugin[[1]]), collapse = ", ")
 
           cat(tabs)
         }
       }
-     # cat(plugin[[1]][[1]])
+      # cat(plugin[[1]][[1]])
 
       cat("\n\n\n")
     }
   }
-  
+
   # Render table using gt
-  table_obj <- res$cols |> 
-    gt() |> 
-    tab_header(title = paste('Column Summary:', tab)) |> 
+  table_obj <- res$cols |>
+    gt() |>
+    tab_header(title = paste("Column Summary:", tab)) |>
     tab_style(
-      style = cell_fill(color = '#ffcccc'),
+      style = cell_fill(color = "#ffcccc"),
       locations = cells_body(rows = incomplete == TRUE)
-    ) |> 
+    ) |>
     cols_label(
-      column = 'Column Name',
-      incomplete = 'Incomplete?',
-      details = 'Concept Info'
+      column = "Column Name",
+      incomplete = "Incomplete?",
+      details = "Concept Info"
     )
-  
+
   # Using as_raw_html to ensure it prints correctly in the loop
   cat(as_raw_html(table_obj))
-  
-  if(length(res$plots) > 0) {
-    cat('\n\n\n')
+
+  if (length(res$plots) > 0) {
+    cat("\n\n\n")
     print(res$plots$year)
   }
-  cat('\n\n---\n\n')
+  cat("\n\n---\n\n")
 }
 ```

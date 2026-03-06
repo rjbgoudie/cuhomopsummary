@@ -1,4 +1,3 @@
-
 #' Summarise a single OMOP table
 #'
 #' @param table_name Name of the table
@@ -7,18 +6,17 @@
 #' @return A list containing row counts, column summaries, and plots
 #' @export
 summarise_omop_table <- function(table_name, data, concept_table = NULL) {
-
   # Row Count
   cli::cli_progress_step("{table_name}: Calculating row count")
-  if (table_name != "measurement"){
-    row_count <- data |> dplyr::tally() |> dplyr::collect() |> dplyr::pull(n)
-  } else {
-    row_count <- "-1"
-  }
+
+  row_count <- data |>
+    dplyr::tally() |>
+    dplyr::collect() |>
+    dplyr::pull(n)
+
   # Column Summaries
   cols <- colnames(data)
   col_summary <- purrr::map_df(cols, function(col) {
-
     cli::cli_progress_step("{table_name}.{col}: Checking for NAs")
     # Check completeness (all 0, NA, or NULL)
     null_count <- data |>
@@ -29,24 +27,24 @@ summarise_omop_table <- function(table_name, data, concept_table = NULL) {
 
     # TODO handle concept 0
 
-    is_incomplete <- if(row_count == 0) FALSE else (null_count == row_count)
+    is_incomplete <- if (row_count == 0) FALSE else (null_count == row_count)
 
 
     # Concept ID analysis
-    concept_info <- 'N/A'
-    if (grepl('_concept_id$', col) && !is.null(concept_table)) {
+    concept_info <- "N/A"
+    if (grepl("_concept_id$", col) && !is.null(concept_table)) {
       cli::cli_progress_step("{table_name}.{col}: checking vocabs")
 
-       vocabs <- data |>
-         dplyr::select(!!rlang::sym(col)) |>
-         dplyr::distinct() |>
-         dplyr::inner_join(concept_table, by = rlang::set_names('concept_id', col)) |>
-         dplyr::select(vocabulary_id) |>
-         dplyr::distinct() |>
-         dplyr::collect()
+      vocabs <- data |>
+        dplyr::select(!!rlang::sym(col)) |>
+        dplyr::distinct() |>
+        dplyr::inner_join(concept_table, by = rlang::set_names("concept_id", col)) |>
+        dplyr::select(vocabulary_id) |>
+        dplyr::distinct() |>
+        dplyr::collect()
 
-       vocabs <- paste(unique(vocabs$vocabulary_id), collapse = ', ')
-       concept_info <- paste0('Vocabs: ', vocabs)
+      vocabs <- paste(unique(vocabs$vocabulary_id), collapse = ", ")
+      concept_info <- paste0("Vocabs: ", vocabs)
     }
 
     data.frame(

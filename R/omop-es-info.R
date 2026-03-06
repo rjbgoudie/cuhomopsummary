@@ -1,4 +1,6 @@
 extract_queries_for_plugin <- function(plugin, name) {
+  cli::cli_progress_step("Extracting queries for {name}")
+
   queries <- list()
 
   # Temporarily override collect() function to give us the query used
@@ -10,13 +12,22 @@ extract_queries_for_plugin <- function(plugin, name) {
           cte = FALSE,
           use_star = FALSE,
           qualify_all_columns = TRUE
-        ))
+        )
+      )
       # Add the query to the queries list
       # Note <<- assigns in the PARENT scope
       queries <<- c(queries, query)
 
       x |>
         dplyr::collect()
+    },
+    dbGetQuery = function(conn, statement, ...) {
+      queries <<- c(queries, statement)
+      DBI::dbGetQuery(
+        conns = conns,
+        statement = statement,
+        ...
+      )
     }
   )
 
@@ -27,7 +38,7 @@ extract_queries_for_plugin <- function(plugin, name) {
   queries
 }
 
-extract_queries <- function(omop_plugins){
+extract_queries <- function(omop_plugins) {
   # This function is copied from omop_es
   enabled_by_settings <- function(plugin) {
     some_intersection <- function(x, y) length(intersect(x, y)) > 0
@@ -41,6 +52,8 @@ extract_queries <- function(omop_plugins){
 
   names(omop_plugins) |>
     map(function(table) {
+      cli::cli_h1("Extracting queries for {table}")
+
       omop_plugins[[table]] |>
         walk(check_type) |>
         keep(enabled_by_settings) |>
@@ -50,12 +63,13 @@ extract_queries <- function(omop_plugins){
 }
 
 extract_caboodle_tables_for_plugin <- function(plugin, name) {
+  cli::cli_progress_step("Extracting tables for {name}")
+
   caboodle_tables <- list()
 
   # Temporarily override collect() function to give us the query used
   rlang::local_bindings(
     tbl = function(src, from, ...) {
-
       # Add the query to the queries list
       # Note <<- assigns in the PARENT scope
       caboodle_tables <<- c(caboodle_tables, from)
@@ -72,7 +86,7 @@ extract_caboodle_tables_for_plugin <- function(plugin, name) {
   caboodle_tables
 }
 
-extract_caboodle_tables <- function(omop_plugins){
+extract_caboodle_tables <- function(omop_plugins) {
   # This function is copied from omop_es
   enabled_by_settings <- function(plugin) {
     some_intersection <- function(x, y) length(intersect(x, y)) > 0
@@ -86,6 +100,8 @@ extract_caboodle_tables <- function(omop_plugins){
 
   names(omop_plugins) |>
     map(function(table) {
+      cli::cli_h1("Extracting tables for {table}")
+
       omop_plugins[[table]] |>
         walk(check_type) |>
         keep(enabled_by_settings) |>
