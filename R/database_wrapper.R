@@ -6,14 +6,13 @@
 summarise_omop_database <- function(source, schema = NULL) {
   is_db <- inherits(source, "DBIConnection")
 
-  cli::cli_h1("cuhomop: Initialising Summary")
+  cli::cli_h1("Getting list of tables")
 
-  # Logic to get table names based on schema
   if (is_db) {
     if (!is.null(schema)) {
       cli::cli_alert_info("Fetching tables for schema: {.val {schema}}")
       # We query information_schema if possible, otherwise fallback to filtering ListObjects
-      table_names <- tryCatch(
+      available_tables <- tryCatch(
         {
           DBI::dbGetQuery(
             source,
@@ -29,25 +28,25 @@ summarise_omop_database <- function(source, schema = NULL) {
       )
     } else {
       cli::cli_alert_warning("No schema specified. Listing all accessible tables (may be slow).")
-      table_names <- DBI::dbListTables(source)
+      available_tables <- DBI::dbListTables(source)
     }
   } else {
-    table_names <- names(source)
+    available_tables <- names(source)
   }
 
-  cdm_tables <- omop_cdm_table_level() |>
-    filter(schema == "CDM") |>
-    pull(cdmTableName)
-
-  table_names <- intersect(table_names, cdm_tables)
-
-  if (length(table_names) == 0) {
+  if (length(available_tables) == 0) {
     cli::cli_abort("No tables found in the specified source/schema.")
   }
 
+  available_cdm_tables <- omop_cdm_table_level() |>
+    filter(cdmTableName %in% available_tables)
+
+  table_names <- available_cdm_tables |>
+    pull(cdmTableName)
+
   concept_tbl <- NULL
   if (is_db) {
-    if ("concept" %in% table_names) {
+    if ("concept" %in% available_tables) {
       concept_tbl <- dplyr::tbl(source, if (!is.null(schema)) dbplyr::in_schema(schema, "concept") else "concept")
     }
   } else if ("concept" %in% names(source)) {
@@ -55,7 +54,6 @@ summarise_omop_database <- function(source, schema = NULL) {
   }
 
   results <- purrr::map(table_names, function(nm) {
-    # Update progress bar status and increment
     cli::cli_h2(paste0("Analysing: ", nm))
 
     data_tbl <- if (is_db) {
@@ -66,16 +64,24 @@ summarise_omop_database <- function(source, schema = NULL) {
     summarise_omop_table(nm, data_tbl, concept_tbl)
   })
 
-  cli::cli_alert_success("Full database summary complete!")
+  cli::cli_alert_success("Full database summary complete")
 
   names(results) <- table_names
   return(results)
 }
 
-
 omop_cdm_table_level <- function() {
   readr::read_csv(
     system.file("OMOP_CDMv5.4_Table_Level.csv",
+      package = "cuhomopsummary"
+    )
+  )
+}
+
+
+omop_cdm_field_level <- function() {
+  readr::read_csv(
+    system.file("OMOP_CDMv5.4_Field_Level.csv",
       package = "cuhomopsummary"
     )
   )
