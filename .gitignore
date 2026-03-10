@@ -6,3 +6,4 @@
 .quarto
 inst/templates/*.html
 *.rds
+inst/templates/*.md
