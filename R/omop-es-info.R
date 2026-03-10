@@ -86,9 +86,17 @@ extract_caboodle_tables_for_plugin <- function(plugin, name) {
   # Temporarily override collect() function to give us the query used
   rlang::local_bindings(
     tbl = function(src, from, ...) {
+      if (class(from) == "character") {
+        from_string <- from
+      } else if (class(from) == "Id") {
+        from_string <- as.character(dbQuoteIdentifier(src, from))
+      } else if (class(from) == "AsIs") {
+        from_string <- as.character(from)
+      }
+
       # Add the query to the queries list
       # Note <<- assigns in the PARENT scope
-      caboodle_tables <<- c(caboodle_tables, from)
+      caboodle_tables <<- c(caboodle_tables, from_string)
 
       x |>
         dplyr::tbl(src = src, from = from, ...)
