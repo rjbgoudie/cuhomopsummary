@@ -4,11 +4,16 @@ output:
   html_document:
     toc: true
     toc_float: true
+    page-layout: full
+    toc-location: left
     theme: cosmo
 params:
   summary_data: null
   plugins_queries: null
   caboodle_tables: null
+  table_level_mds: null
+  table_level_private_mds: null
+  caboodle_docs_url: null
 ---
 
 ```{r setup, include=FALSE}
@@ -16,6 +21,7 @@ library(ggplot2)
 library(dplyr)
 library(gt)
 library(stringr)
+library(scales)
 ```
 
 # Database Overview
@@ -26,22 +32,44 @@ Summary of the OMOP CDM tables with completeness alerts.
 res_list <- params$summary_data
 plugins_queries <- params$plugins_queries
 caboodle_tables <- params$caboodle_tables
+caboodle_docs_url <- params$caboodle_docs_url
 
-for (tab in names(res_list)) {
-  res <- res_list[[tab]]
+tables <- res_list |>
+  distinct(table) |>
+  pull(table)
+
+for (tab in tables) {
+  res <- res_list |>
+    filter(table == tab)
+
   cat("\n## ", tab, "\n\n\n")
-  cat("**Total Rows:** ", format(res$count, big.mark = ","), "\n\n\n")
+
+  if (!is.null(table_level_mds[[tab]])) {
+    cat(table_level_mds[[tab]])
+    cat("\n\n")
+  }
+
+  if (!is.null(table_level_private_mds[[tab]])) {
+    cat(table_level_private_mds[[tab]])
+    cat("\n\n")
+  }
+
+  row_count <- unique(res$row_count)
+
+  cat("**Total Rows:** ", comma(as.integer(row_count)), "\n\n\n")
+
+  omop_es_mapper_url <- "https://github.com/rjbgoudie/omop_es/tree/master/mapping/CUH"
 
   if (length(plugins_queries[tab]) > 0) {
     cat("### SQL queries\n\n")
     plugin_names <- names(plugins_queries[[tab]])
     for (plugin_name in plugin_names) {
       plugin <- plugins_queries[[tab]][[plugin_name]]
-      cat(glue("<details><summary>Plugin: {plugin_name}</summary><code>\n"))
+      cat(glue("<details><summary>Plugin: {plugin_name} (<a href=\"{omop_es_mapper_url}/{tab}/{plugin_name}.R\">GitHub source</a>)</summary><code>\n"))
       if (length(plugin) > 0) {
         nqueries <- length(plugin)
         for (i in 1:nqueries) {
-          cat(glue("&ndash;&ndash; Query {i} of {nqueries}<br>"))
+          cat(glue("&ndash;&ndash; Query {i} of {nqueries}\n<br>"))
           sql <- plugin[[i]] |>
             str_replace_all("\n", "<br>") |>
             str_replace_all(" ", "&nbsp;") |>
@@ -63,7 +91,21 @@ for (tab in names(res_list)) {
 
       if (length(plugin) > 0) {
         if (length(plugin[[1]]) > 0) {
-          tabs <- paste(unlist(plugin[[1]]), collapse = ", ")
+          tabs <- unique(unlist(plugin[[1]])) |>
+            map_if(
+              ~ !str_detect(.x, "\""),
+              function(table) {
+                glue("[`{table}`]({caboodle_docs_url}{table})")
+              }
+            ) |>
+            map_if(
+              ~ str_detect(.x, "\""),
+              function(table) {
+                glue("`{table}`")
+              }
+            )
+
+          tabs <- paste(tabs, collapse = ", ")
 
           cat(tabs)
         }
@@ -74,27 +116,59 @@ for (tab in names(res_list)) {
     }
   }
 
+  athena_vocab_url <- "https://athena.ohdsi.org/search-terms/terms?vocabulary="
+
+  create_athena_links <- function(vocabs_used) {
+    map_chr(vocabs_used, function(vocab) {
+      if (length(vocab) == 1 && is.na(vocab)) {
+        ""
+      } else {
+        glue_collapse(
+          glue("[{vocab}]({athena_vocab_url}{vocab})"),
+          sep = ", "
+        )
+      }
+    })
+  }
+
+  cat("### Field-level information\n\n")
   # Render table using gt
-  table_obj <- res$cols |>
+  table_obj <- res |>
+    select(column, all_na_null_or_zero, vocabs_used, userGuidance, n_distinct_concepts, n_concept_zero) |>
+    relocate(column, all_na_null_or_zero, vocabs_used, n_concept_zero, n_distinct_concepts, userGuidance, .after = last_col()) |>
+    mutate(
+      column = glue("`{column}`"),
+      status =
+        case_when(
+          all_na_null_or_zero ~ "Not implemented",
+          !is.na(n_distinct_concepts) ~ glue("<ul><li>{comma(as.integer(n_distinct_concepts))} distinct concepts<li>{comma(as.integer(n_concept_zero))} rows with `concept_id=0`</ul>"),
+          TRUE ~ ""
+        ),
+      vocabs_used = create_athena_links(vocabs_used)
+    ) |>
+    relocate(status, .after = column) |>
+    select(-all_na_null_or_zero, -n_concept_zero, -n_distinct_concepts) |>
     gt() |>
-    tab_header(title = paste("Column Summary:", tab)) |>
     tab_style(
-      style = cell_fill(color = "#ffcccc"),
-      locations = cells_body(rows = incomplete == TRUE)
+      style = cell_text(color = "#999999", style = "italic"),
+      locations = cells_body(rows = status == "Not implemented")
     ) |>
     cols_label(
-      column = "Column Name",
-      incomplete = "Incomplete?",
-      details = "Concept Info"
-    )
+      column = "Column",
+      status = "Status",
+      vocabs_used = "Vocabularies",
+      userGuidance = "OMOP specification"
+    ) |>
+    fmt_markdown(columns = status) |>
+    cols_align(everything(), align = "left")
 
   # Using as_raw_html to ensure it prints correctly in the loop
   cat(as_raw_html(table_obj))
 
-  if (length(res$plots) > 0) {
-    cat("\n\n\n")
-    print(res$plots$year)
-  }
+  # if (length(res$plots) > 0) {
+  #   cat("\n\n\n")
+  #   print(res$plots$year)
+  # }
   cat("\n\n---\n\n")
 }
 ```
