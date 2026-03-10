@@ -6,13 +6,29 @@ extract_queries_for_plugin <- function(plugin, name) {
   # Temporarily override collect() function to give us the query used
   rlang::local_bindings(
     collect = function(x) {
-      query <- sql_render(
-        x,
-        sql_options = sql_options(
-          cte = FALSE,
-          use_star = FALSE,
-          qualify_all_columns = TRUE
-        )
+      # Use CTEs if we can, but this sometimes fails (generally on simple
+      # queries that involve only a single table). If so, revert to non-CTEs
+      query <- tryCatch(
+        {
+          sql_render(
+            x,
+            sql_options = sql_options(
+              cte = TRUE,
+              use_star = FALSE,
+              qualify_all_columns = TRUE
+            )
+          )
+        },
+        error = function(e) {
+          sql_render(
+            x,
+            sql_options = sql_options(
+              cte = FALSE,
+              use_star = FALSE,
+              qualify_all_columns = TRUE
+            )
+          )
+        }
       )
       # Add the query to the queries list
       # Note <<- assigns in the PARENT scope
